@@ -237,8 +237,17 @@ bool demonstrateHostPTXLoading() {
     // Get CUDA device and create context
     CUdevice device;
     CUcontext context;
-    cuDeviceGet(&device, 0);
-    cuCtxCreate(&context, 0, device);
+    result = cuDeviceGet(&device, 0);
+    if (result != CUDA_SUCCESS) {
+        printf("Error: Failed to get CUDA device\n");
+        return false;
+    }
+
+    result = cuCtxCreate(&context, 0, device);
+    if (result != CUDA_SUCCESS) {
+        printf("Error: Failed to create CUDA context\n");
+        return false;
+    }
     
     // Load PTX module
     std::string ptxSource = readPTXFile("vector_add.ptx");
@@ -258,7 +267,13 @@ bool demonstrateHostPTXLoading() {
     
     // Get function and execute
     CUfunction function;
-    cuModuleGetFunction(&function, module, "vector_add_ptx");
+    result = cuModuleGetFunction(&function, module, "vector_add_ptx");
+    if (result != CUDA_SUCCESS) {
+        printf("Error: Failed to find vector_add_ptx in PTX module\n");
+        cuModuleUnload(module);
+        cuCtxDestroy(context);
+        return false;
+    }
     
     const int n = 1000;
     size_t size = n * sizeof(int);
