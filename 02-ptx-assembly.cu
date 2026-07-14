@@ -105,7 +105,7 @@ bool verifyVectorAdd(const int* a, const int* b, const int* result, int n) {
 }
 
 // Host function to demonstrate different approaches
-bool demonstrateDevicePTXCalls() {
+bool demonstrateDevicePTXCalls(bool cooperative_launch_supported) {
     const int n = 1000;
     int *h_a, *h_b, *h_result;
     int *d_a, *d_b, *d_result;
@@ -155,19 +155,35 @@ bool demonstrateDevicePTXCalls() {
     // Method 2: Cooperative Groups
     printf("2. Kernel with Cooperative Groups:\n");
     void* kernelArgs[] = {(void*)&d_a, (void*)&d_b, (void*)&d_result, (void*)&n};
-    
-    cudaMemset(d_result, 0, size);
-    cudaLaunchCooperativeKernel((void*)kernelWithCooperativeGroups,
-                               numBlocks, blockSize, kernelArgs, 0, 0);
-    cudaDeviceSynchronize();
-    
-    cudaMemcpy(h_result, d_result, size, cudaMemcpyDeviceToHost);
-    printf("First 5 results: ");
-    for (int i = 0; i < 5; i++) {
-        printf("%d+%d=%d ", h_a[i], h_b[i], h_result[i]);
+
+    if (!cooperative_launch_supported) {
+        printf("Skipped: this device does not support cooperative launch\n\n");
+    } else {
+        cudaMemset(d_result, 0, size);
+        cudaError_t launch_status = cudaLaunchCooperativeKernel(
+            (void*)kernelWithCooperativeGroups,
+            numBlocks, blockSize, kernelArgs, 0, 0);
+        if (launch_status != cudaSuccess) {
+            fprintf(stderr, "Cooperative kernel launch failed: %s\n\n",
+                    cudaGetErrorString(launch_status));
+            all_results_valid = false;
+        } else {
+            cudaError_t sync_status = cudaDeviceSynchronize();
+            if (sync_status != cudaSuccess) {
+                fprintf(stderr, "Cooperative kernel execution failed: %s\n\n",
+                        cudaGetErrorString(sync_status));
+                all_results_valid = false;
+            } else {
+                cudaMemcpy(h_result, d_result, size, cudaMemcpyDeviceToHost);
+                printf("First 5 results: ");
+                for (int i = 0; i < 5; i++) {
+                    printf("%d+%d=%d ", h_a[i], h_b[i], h_result[i]);
+                }
+                printf("\n");
+                all_results_valid &= verifyVectorAdd(h_a, h_b, h_result, n);
+            }
+        }
     }
-    printf("\n");
-    all_results_valid &= verifyVectorAdd(h_a, h_b, h_result, n);
     
     // Method 2.5: Function Pointer Approach
     printf("2.5. Kernel with function pointer:\n");
@@ -310,7 +326,7 @@ int main() {
     printf("\n");
     
     // Demonstrate different approaches
-    bool device_calls_valid = demonstrateDevicePTXCalls();
+    bool device_calls_valid = demonstrateDevicePTXCalls(prop.cooperativeLaunch);
     bool host_ptx_valid = demonstrateHostPTXLoading();
 
     if (!device_calls_valid || !host_ptx_valid) {
