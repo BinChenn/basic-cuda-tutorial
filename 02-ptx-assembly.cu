@@ -228,6 +228,7 @@ bool demonstrateHostPTXLoading() {
     std::string ptxSource = readPTXFile("vector_add.ptx");
     if (ptxSource.empty()) {
         printf("Failed to read PTX file\n");
+        cuCtxDestroy(context);
         return false;
     }
     
@@ -235,6 +236,7 @@ bool demonstrateHostPTXLoading() {
     result = cuModuleLoadData(&module, ptxSource.c_str());
     if (result != CUDA_SUCCESS) {
         printf("Error: Failed to load PTX module\n");
+        cuCtxDestroy(context);
         return false;
     }
     
