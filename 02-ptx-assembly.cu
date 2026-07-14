@@ -280,7 +280,9 @@ bool demonstrateHostPTXLoading() {
     
     cuMemcpyHtoD(d_a, h_a, size);
     cuMemcpyHtoD(d_b, h_b, size);
-    
+
+    cuMemsetD8(d_result, 0, size);
+
     // Launch PTX kernel from host
     void* args[] = { (void*)&d_a, (void*)&d_b, (void*)&d_result, (void*)&n };
     cuLaunchKernel(function, (n + 255) / 256, 1, 1, 256, 1, 1, 0, nullptr, args, nullptr);
