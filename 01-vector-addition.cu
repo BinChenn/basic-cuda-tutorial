@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <chrono>
 
 // CUDA kernel function to add two vectors
 __global__ void vectorAdd(const float *A, const float *B, float *C, int numElements) {
@@ -23,9 +24,15 @@ __global__ void vectorAdd(const float *A, const float *B, float *C, int numEleme
     }
 }
 
+void vectorAddCPU(const float *A, const float *B, float *C, int numElements) {
+    for (int i = 0; i < numElements; i++) {
+        C[i] = A[i] + B[i];
+    }
+}
+
 int main() {
     // Vector size and memory size
-    int numElements = 50000;
+    int numElements = 500000;
     size_t size = numElements * sizeof(float);
     
     printf("Vector addition of %d elements\n", numElements);
@@ -58,7 +65,22 @@ int main() {
     int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
     printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid, threadsPerBlock);
     
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
+
     vectorAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, numElements);
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("Kernel execution time: %.0f us\n", milliseconds * 1000);
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
     
     // Check for errors in kernel launch
     cudaError_t err = cudaGetLastError();
@@ -66,6 +88,12 @@ int main() {
         fprintf(stderr, "Failed to launch kernel: %s\n", cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
+
+    auto cpu_start = std::chrono::high_resolution_clock::now();
+    vectorAddCPU(h_A, h_B, h_C, numElements);
+    auto cpu_end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(cpu_end - cpu_start);
+    printf("CPU execution time: %ld us\n", duration.count());
     
     // Copy result back to host
     cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);

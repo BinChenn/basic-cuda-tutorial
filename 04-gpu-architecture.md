@@ -44,6 +44,19 @@ Think of an SM as a factory floor with multiple assembly lines. Each assembly li
 
 When you launch a kernel, the CUDA runtime distributes your thread blocks across the available SMs. If you launch 340 blocks and have 170 SMs, initially two blocks will be assigned to each SM. As blocks complete, new ones get scheduled. This is why having more blocks than SMs is generally good - it keeps all the hardware busy.
 
+
+Logical Concepts:
+1. Grid
+2. Block, a thread block is executed in a single SM
+3. Thread
+
+Physical Concepts：
+
+- GPU -> multiple SMs
+- SM -> register file, L1 cache and shared memory
+- warp -> 32 threads doing the same thing (SIMD: single instruction multiple threads)
+
+
 ### The Thread Execution Model
 
 Every thread in CUDA has a unique identity determined by its position in a three-dimensional grid:
